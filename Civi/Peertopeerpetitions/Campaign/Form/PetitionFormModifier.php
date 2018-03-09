@@ -14,9 +14,9 @@ class PetitionFormModifier {
    *
    * @throws \HTML_QuickForm_Error
    */
-  public static function modify($form) {
+  public static function modify(&$form) {
     self::addFormElements($form);
-    //self::setDefaults($form);
+    //self::setDefaults(&$form);
   }
 
   /**
@@ -24,7 +24,7 @@ class PetitionFormModifier {
    *
    * @throws \HTML_QuickForm_Error
    */
-  protected static function addFormElements($form) {
+  protected static function addFormElements(&$form) {
     // Checkbox to enable PCPs
     $form->addElement('checkbox',
       'pcp_active',
@@ -107,6 +107,37 @@ class PetitionFormModifier {
       $form->assign('profile', $profile);
     }
     return $profile;
+  }
+
+  /**
+   * Save the form values. This code is mostly copied from
+   * \CRM_PCP_Form_Contribute::postProcess
+   *
+   * @param \CRM_Campaign_Form_Petition $form
+   */
+  public static function postProcess(&$form) {
+    // get the submitted form values.
+    $params = $form->controller->exportValues($form->getVar('_name'));
+
+    // Source
+    $params['entity_table'] = 'civicrm_survey';
+    $params['entity_id'] = $form->getVar('_entityId');
+
+    // Target
+    $params['target_entity_type'] = 'civicrm_survey';
+    $params['target_entity_id'] = $form->getVar('_entityId');
+
+    $dao = new \CRM_PCP_DAO_PCPBlock();
+    $dao->entity_table = $params['entity_table'];
+    $dao->entity_id = $form->getVar('_id');
+    $dao->find(TRUE);
+    $params['id'] = $dao->id;
+    $params['is_active'] = \CRM_Utils_Array::value('pcp_active', $params, FALSE);
+    $params['is_approval_needed'] = \CRM_Utils_Array::value('is_approval_needed', $params, FALSE);
+    $params['is_tellfriend_enabled'] = 0;
+
+    \CRM_PCP_BAO_PCPBlock::create($params);
+
   }
 
 }

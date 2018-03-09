@@ -30,6 +30,21 @@ function peertopeerpetitions_civicrm_buildForm($formName, &$form) {
 }
 
 /**
+ * Implements hook_civicrm_postProcess().
+ *
+ * @param string $formName
+ * @param CRM_Core_Form $form
+ */
+function peertopeerpetitions_civicrm_postProcess($formName, &$form) {
+  if (($formName == 'CRM_Campaign_Form_Petition')) {
+    /**
+     * @var CRM_Campaign_Form_Petition $form
+     */
+    PetitionFormModifier::postProcess($form);
+  }
+}
+
+/**
  * Implements hook_civicrm_config().
  *
  * @link http://wiki.civicrm.org/confluence/display/CRMDOC/hook_civicrm_config
