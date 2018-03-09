@@ -14,9 +14,9 @@ class PetitionFormModifier {
    *
    * @throws \HTML_QuickForm_Error
    */
-  public static function modify(&$form) {
+  public static function buildForm(&$form) {
     self::addFormElements($form);
-    //self::setDefaults(&$form);
+    self::setDefaults($form);
   }
 
   /**
@@ -73,6 +73,34 @@ class PetitionFormModifier {
   }
 
   /**
+   * Adds more default values to the form so that it loads with data in the
+   * pcp_block fields if a corresponding pcp_block already exists
+   *
+   * @param \CRM_Campaign_Form_Petition $form
+   *
+   * @throws \HTML_QuickForm_Error
+   */
+  protected static function setDefaults(&$form) {
+    $defaults = [];
+    if (isset($form->_surveyId)) {
+      $params = [
+        'entity_id' => $form->_surveyId,
+        'entity_table' => 'civicrm_survey'
+      ];
+      \CRM_Core_DAO::commonRetrieve('CRM_PCP_DAO_PCPBlock', $params, $defaults);
+      $defaults['pcp_active'] = \CRM_Utils_Array::value('is_active', $defaults);
+    }
+
+    if (empty($defaults['id'])) {
+      $defaults['target_entity_type'] = 'event';
+      $defaults['is_approval_needed'] = 0;
+      $defaults['link_text'] = ts('Promote this survey with a personal campaign page');
+      $defaults['owner_notify_id'] = \CRM_Core_OptionGroup::getDefaultValue('pcp_owner_notify');
+    }
+    $form->setDefaults($defaults);
+  }
+
+  /**
    * This function does some magic to retrieve the list of profiles needed for
    * the form element where the user chooses a profile. I copied this code
    * from \CRM_PCP_BAO_PCP::buildPCPForm. I don't understand the difference
@@ -83,7 +111,7 @@ class PetitionFormModifier {
    * @return array
    */
   protected static function getProfiles($form) {
-    $profile = array();
+    $profile = [];
     $isUserRequired = NULL;
     $config = \CRM_Core_Config::singleton();
     if ($config->userFramework != 'Standalone') {

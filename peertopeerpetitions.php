@@ -19,7 +19,7 @@ function peertopeerpetitions_civicrm_buildForm($formName, &$form) {
      */
 
     // add more elements to the form, set default values, etc
-    PetitionFormModifier::modify($form);
+    PetitionFormModifier::buildForm($form);
 
     // insert a template block in the page
     CRM_Core_Region::instance('page-body')->add(array(
