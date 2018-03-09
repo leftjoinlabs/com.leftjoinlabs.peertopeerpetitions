@@ -2,6 +2,32 @@
 
 require_once 'peertopeerpetitions.civix.php';
 use CRM_Peertopeerpetitions_ExtensionUtil as E;
+use Civi\Peertopeerpetitions\Campaign\Form\PetitionFormModifier as PetitionFormModifier;
+
+/**
+ * Implements hook_civicrm_buildForm().
+ *
+ * @param string $formName
+ * @param mixed $form
+ *
+ * @throws \HTML_QuickForm_Error
+ */
+function peertopeerpetitions_civicrm_buildForm($formName, &$form) {
+  if (($formName == 'CRM_Campaign_Form_Petition')) {
+    /**
+     * @var CRM_Campaign_Form_Petition $form
+     */
+
+    // add more elements to the form, set default values, etc
+    PetitionFormModifier::modify($form);
+
+    // insert a template block in the page
+    CRM_Core_Region::instance('page-body')->add(array(
+      'template' => "CRM/PCP/Form/Petition.tpl"
+    ));
+
+  }
+}
 
 /**
  * Implements hook_civicrm_config().
