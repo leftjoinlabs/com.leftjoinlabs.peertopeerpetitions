@@ -45,6 +45,24 @@ function peertopeerpetitions_civicrm_postProcess($formName, &$form) {
 }
 
 /**
+ * Implements hook_civicrm_validateForm().
+ *
+ * @param string $formName
+ * @param array $fields
+ * @param array $files
+ * @param CRM_Core_Form $form
+ * @param array $errors
+ */
+function peertopeerpetitions_civicrm_validateForm($formName, &$fields, &$files, &$form, &$errors) {
+  if (($formName == 'CRM_Campaign_Form_Petition')) {
+    /**
+     * @var CRM_Campaign_Form_Petition $form
+     */
+    PetitionFormModifier::validate($fields, $form, $errors);
+  }
+}
+
+/**
  * Implements hook_civicrm_config().
  *
  * @link http://wiki.civicrm.org/confluence/display/CRMDOC/hook_civicrm_config

@@ -165,7 +165,45 @@ class PetitionFormModifier {
     $params['is_tellfriend_enabled'] = 0;
 
     \CRM_PCP_BAO_PCPBlock::create($params);
+  }
 
+  /**
+   * Implements hook_civicrm_validateForm().
+   *
+   * @param array $fields
+   * @param \CRM_Campaign_Form_Petition $form
+   * @param array $errors
+   */
+  public static function validate(&$fields, &$form, &$errors) {
+    if (!empty($fields['pcp_active']) && $fields['pcp_active'] == "1") {
+
+      // Require a profile to be chosen, and make sure the profile has an email address
+      if (empty($fields['supporter_profile_id'])) {
+        $errors['supporter_profile_id'] = ts('Supporter profile is a required field.');
+      }
+      else {
+        if (\CRM_PCP_BAO_PCP::checkEmailProfile($fields['supporter_profile_id'])) {
+          $errors['supporter_profile_id'] = ts('Profile is not configured with Email address.');
+        }
+      }
+
+      // Require an owner notification strategy
+      if (empty($fields['owner_notify_id'])) {
+        $errors['owner_notify_id'] = ts('Owner Email Notification is a required field.');
+      }
+
+      // Require a valid notification email addresses
+      $emails = \CRM_Utils_Array::value('notify_email', $fields);
+      if (!empty($emails)) {
+        $emailArray = explode(',', $emails);
+        foreach ($emailArray as $email) {
+          if ($email && !\CRM_Utils_Rule::email(trim($email))) {
+            $errors['notify_email'] = ts('A valid Notify Email address must be specified');
+          }
+        }
+      }
+
+    }
   }
 
 }
