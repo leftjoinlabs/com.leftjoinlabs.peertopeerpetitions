@@ -157,7 +157,7 @@ class PetitionFormModifier {
 
     $dao = new \CRM_PCP_DAO_PCPBlock();
     $dao->entity_table = $params['entity_table'];
-    $dao->entity_id = $form->getVar('_id');
+    $dao->entity_id = $params['entity_id'];
     $dao->find(TRUE);
     $params['id'] = $dao->id;
     $params['is_active'] = \CRM_Utils_Array::value('pcp_active', $params, FALSE);
