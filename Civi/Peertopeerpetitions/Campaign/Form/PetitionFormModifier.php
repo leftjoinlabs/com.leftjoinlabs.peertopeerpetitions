@@ -15,8 +15,21 @@ class PetitionFormModifier {
    * @throws \HTML_QuickForm_Error
    */
   public static function buildForm(&$form) {
-    self::addFormElements($form);
-    self::setDefaults($form);
+    $acceptableActions = [
+      \CRM_Core_Action::ADD,
+      \CRM_Core_Action::UPDATE,
+      NULL
+    ];
+    $actionIsAcceptable = in_array($form->_action, $acceptableActions);
+    if ($actionIsAcceptable) {
+      self::addFormElements($form);
+      self::setDefaults($form);
+
+      // insert a template block in the page
+      \CRM_Core_Region::instance('page-body')->add(array(
+        'template' => "CRM/PCP/Form/Petition.tpl",
+      ));
+    }
   }
 
   /**
