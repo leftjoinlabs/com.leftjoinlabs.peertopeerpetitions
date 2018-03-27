@@ -9,6 +9,8 @@ namespace Civi\Peertopeerpetitions\Campaign\Form;
 
 class PetitionFormModifier {
 
+  const GLOBAL_KEY_SURVEY_ID = 'peertopeerpetitions_surveyId';
+
   /**
    * @param \CRM_Campaign_Form_Petition $form
    *
@@ -151,22 +153,33 @@ class PetitionFormModifier {
   }
 
   /**
-   * Save the form values. This code is mostly copied from
+   * Update a pcp_block entity after a survey is updated.
+   *
+   * Much of this code is mostly copied from
    * \CRM_PCP_Form_Contribute::postProcess
    *
    * @param \CRM_Campaign_Form_Petition $form
+   *
+   * @throws \CRM_Core_Exception
+   *   If we can't find surveyId
    */
   public static function postProcess(&$form) {
+    $surveyId = self::getSurveyId($form);
+
+    if (empty($surveyId)) {
+      throw new \CRM_Core_Exception('Unable to determine ID of survey while trying to update a pcp_block associated with a survey.');
+    }
+
     // get the submitted form values.
     $params = $form->controller->exportValues($form->getVar('_name'));
 
     // Source
     $params['entity_table'] = 'civicrm_survey';
-    $params['entity_id'] = $form->getVar('_entityId');
+    $params['entity_id'] = $surveyId;
 
     // Target
     $params['target_entity_type'] = 'civicrm_survey';
-    $params['target_entity_id'] = $form->getVar('_entityId');
+    $params['target_entity_id'] = $surveyId;
 
     $dao = new \CRM_PCP_DAO_PCPBlock();
     $dao->entity_table = $params['entity_table'];
@@ -177,7 +190,29 @@ class PetitionFormModifier {
     $params['is_approval_needed'] = \CRM_Utils_Array::value('is_approval_needed', $params, FALSE);
     $params['is_tellfriend_enabled'] = 0;
 
-    \CRM_PCP_BAO_PCPBlock::create($params);
+    if ($form->_action == \CRM_Core_Action::DELETE) {
+      $dao->delete();
+    }
+    else {
+      \CRM_PCP_BAO_PCPBlock::create($params);
+    }
+  }
+
+  /**
+   * Get the ID of a survey after it has been updated so that we can update
+   * the pcp_block in hook_civicrm_postProcess.
+   *
+   * When the form is saved to create or update a Survey entity,
+   * hook_civicrm_post fires before hook_civicrm_postProcess. We get the form
+   * values in hook_civicrm_postProcess, but in the case of creating a new
+   * survey, we don't get the survey ID in hook_civicrm_postProcess. So we grab
+   * the ID here and store it globally to access it from
+   * hook_civicrm_postProcess later on.
+   *
+   * @param int $surveyId
+   */
+  public static function post($surveyId) {
+    self::setSurveyId($surveyId);
   }
 
   /**
@@ -217,6 +252,59 @@ class PetitionFormModifier {
       }
 
     }
+  }
+
+  /**
+   * @see \Civi\Peertopeerpetitions\Campaign\Form\PetitionFormModifier::getSurveyId
+   *
+   * @param int $surveyId
+   */
+  protected static function setSurveyId($surveyId) {
+    $GLOBALS[self::GLOBAL_KEY_SURVEY_ID] = $surveyId;
+  }
+
+  /**
+   * Look in multiple places to find the ID of the survey we're updating, so
+   * that we can use this ID update a pcp_block. We need to do this weird logic
+   * here because, depending on the survey action (create/update/delete),
+   * the survey ID will be in different places.
+   *
+   * In general:
+   * - We want to update the pcp_block from within hook_civicrm_postProcess
+   *   because that's where we get the form values for the pcp_block fields.
+   *
+   * When creating a survey:
+   * - We need to use the global var because the form doesn't supply the ID
+   *   for the survey
+   *
+   * When deleting a survey:
+   * - We need to use $form->_surveyId because hook_civicrm_postProcess runs
+   *   before hook_civicrm_post (so the global var won't have been set yet).
+   *
+   * When updating a survey:
+   * - ??
+   *
+   * Set the ID of the saved survey in this hacky global var. This is because
+   * we can't reliably get the ID from within hook_civicrm_postProcess (where
+   * we need it) because the form won't have an ID if it's a new survey. So
+   * we grab the ID from hook_civicrm_post and save it globally.
+   *
+   * @param \CRM_Campaign_Form_Petition $form
+   *
+   * @return int|null
+   */
+  protected static function getSurveyId($form = NULL) {
+
+    // If we're deleting a survey, then we need t
+    if (!empty($form->_surveyId)) {
+      return (int) $form->_surveyId;
+    }
+
+    if (!empty($GLOBALS[self::GLOBAL_KEY_SURVEY_ID])) {
+      return $GLOBALS[self::GLOBAL_KEY_SURVEY_ID];
+    }
+
+    return NULL;
   }
 
 }

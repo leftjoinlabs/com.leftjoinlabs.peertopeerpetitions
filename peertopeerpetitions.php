@@ -39,6 +39,18 @@ function peertopeerpetitions_civicrm_postProcess($formName, &$form) {
 }
 
 /**
+ * @param string $op
+ * @param string $objectName
+ * @param int $objectId
+ * @param mixed $objectRef
+ */
+function peertopeerpetitions_civicrm_post($op, $objectName, $objectId, &$objectRef) {
+  if ($objectName = 'Survey') {
+    PetitionFormModifier::post($objectId);
+  }
+}
+
+/**
  * Implements hook_civicrm_validateForm().
  *
  * @param string $formName
