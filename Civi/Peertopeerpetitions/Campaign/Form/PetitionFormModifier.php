@@ -7,9 +7,25 @@
 
 namespace Civi\Peertopeerpetitions\Campaign\Form;
 
+use \Civi\Peertopeerpetitions\PCP\BAO\PCPBlock;
+
 class PetitionFormModifier {
 
+  /**
+   * Array key for the "surveyId" value that we need to store in $GLOBALS
+   * The prefix helps avoid name collisions
+   */
   const GLOBAL_KEY_SURVEY_ID = 'peertopeerpetitions_surveyId';
+
+  /**
+   * Add this prefix to all the form elements that we're injecting into this
+   * form. This helps avoid name collisions with the standard survey form
+   * elements (e.g `is_active`)
+   *
+   * IMPORTANT: This prefix is hard-coded into this template:
+   *   templates/CRM/PCP/Form/Petition.tpl
+   */
+  const PREFIX = 'pcp_block_';
 
   /**
    * @param \CRM_Campaign_Form_Petition $form
@@ -41,29 +57,33 @@ class PetitionFormModifier {
    */
   protected static function addFormElements(&$form) {
     // Checkbox to enable PCPs
-    $form->addElement('checkbox',
-      'pcp_active',
+    $form->addElement(
+      'checkbox',
+      self::PREFIX . 'is_active',
       ts('Enable Personal Campaign Pages? (for this petition)'),
       NULL,
-      array('onclick' => "return showHideByValue('pcp_active',true,'pcpFields','table-row','radio',false);")
+      array('onclick' => "return showHideByValue('" . self::PREFIX . "is_active',true,'pcpFields','table-row','radio',false);")
     );
 
     // Checkbox to make approval required
-    $form->addElement('checkbox',
-      'is_approval_needed',
+    $form->addElement(
+      'checkbox',
+      self::PREFIX . 'is_approval_needed',
       ts('Approval required')
     );
 
     // Select element to choose a profile
-    $form->add('select',
-      'supporter_profile_id',
+    $form->add(
+      'select',
+      self::PREFIX . 'supporter_profile_id',
       ts('Supporter Profile'),
       array('' => ts('- select -')) + self::getProfiles($form),
       FALSE
     );
 
     // Radio buttons for notification setting
-    $form->addRadio('owner_notify_id',
+    $form->addRadio(
+      self::PREFIX . 'owner_notify_id',
       ts('Owner Email Notification'),
       \CRM_Core_OptionGroup::values('pcp_owner_notify'),
       NULL,
@@ -72,15 +92,17 @@ class PetitionFormModifier {
     );
 
     // Email address for notifications
-    $form->add('text',
-      'notify_email',
+    $form->add(
+      'text',
+      self::PREFIX . 'notify_email',
       ts('Notify Email'),
       \CRM_Core_DAO::getAttribute('CRM_PCP_DAO_PCPBlock', 'notify_email')
     );
 
     // Text for the link to create new PCPs
-    $form->add('text',
-      'link_text',
+    $form->add(
+      'text',
+      self::PREFIX . 'link_text',
       ts("'Create Personal Campaign Page' link text"),
       \CRM_Core_DAO::getAttribute('CRM_PCP_DAO_PCPBlock', 'link_text')
     );
@@ -96,23 +118,63 @@ class PetitionFormModifier {
    * @throws \HTML_QuickForm_Error
    */
   protected static function setDefaults(&$form) {
-    $defaults = [];
-    if (isset($form->_surveyId)) {
-      $params = [
-        'entity_id' => $form->_surveyId,
-        'entity_table' => 'civicrm_survey'
-      ];
-      \CRM_Core_DAO::commonRetrieve('CRM_PCP_DAO_PCPBlock', $params, $defaults);
-      $defaults['pcp_active'] = \CRM_Utils_Array::value('is_active', $defaults);
+    $blankFormValues = [
+      'is_approval_needed' => 0,
+      'link_text' => ts('Promote this survey with a personal campaign page'),
+      'owner_notify_id' => \CRM_Core_OptionGroup::getDefaultValue('pcp_owner_notify'),
+      'is_active' => 0,
+    ];
+
+    $surveyId = self::getSurveyId($form);
+
+    if ($surveyId) {
+      $defaults = PCPBlock::getValuesBySurveyId($surveyId);
+    }
+    else {
+      $defaults = $blankFormValues;
     }
 
-    if (empty($defaults['id'])) {
-      $defaults['target_entity_type'] = 'event';
-      $defaults['is_approval_needed'] = 0;
-      $defaults['link_text'] = ts('Promote this survey with a personal campaign page');
-      $defaults['owner_notify_id'] = \CRM_Core_OptionGroup::getDefaultValue('pcp_owner_notify');
-    }
+    // Add form element prefix to avoid name collisions
+    $defaults = self::prefixKeys($defaults);
+
     $form->setDefaults($defaults);
+    $a = 0;
+  }
+
+  /**
+   * Return $params, but with the array keys prefixed by the special prefix
+   * we use to avoid name collisions for form elements
+   *
+   * @param array $params
+   *
+   * @return array
+   */
+  protected static function prefixKeys($params) {
+    $result = [];
+    foreach ($params as $k => $v) {
+      $result[self::PREFIX . $k] = $v;
+    }
+    return $result;
+  }
+
+  /**
+   * Return $params, with elements removed that are not prefixed, and with the
+   * prefixes removed from the elements that do have them
+   * 
+   * @param array $params
+   *
+   * @return array
+   */
+  protected static function unPrefixKeys ($params) {
+    $result = [];
+    foreach ($params as $key => $v) {
+      $pattern = '/^' . self::PREFIX . '/';
+      if (preg_match($pattern, $key)) {
+        $newKey = preg_replace($pattern, '', $key);
+        $result[$newKey] = $v;
+      }
+    }
+    return $result;
   }
 
   /**
@@ -173,6 +235,9 @@ class PetitionFormModifier {
     // get the submitted form values.
     $params = $form->controller->exportValues($form->getVar('_name'));
 
+    // Remove the prefix added to the names of form elements that we injected
+    $params = self::unPrefixKeys($params);
+
     // Source
     $params['entity_table'] = 'civicrm_survey';
     $params['entity_id'] = $surveyId;
@@ -186,7 +251,7 @@ class PetitionFormModifier {
     $dao->entity_id = $params['entity_id'];
     $dao->find(TRUE);
     $params['id'] = $dao->id;
-    $params['is_active'] = \CRM_Utils_Array::value('pcp_active', $params, FALSE);
+    $params['is_active'] = \CRM_Utils_Array::value('is_active', $params, FALSE);
     $params['is_approval_needed'] = \CRM_Utils_Array::value('is_approval_needed', $params, FALSE);
     $params['is_tellfriend_enabled'] = 0;
 
